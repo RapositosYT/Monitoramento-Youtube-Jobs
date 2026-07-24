@@ -1,0 +1,23 @@
+name: Job 1 - Descoberta
+on:
+  # agendamento nativo do GitHub desativado (era pouco confiavel no minuto 0/
+  # horario cheio); disparo agora e via cron-job.org chamando workflow_dispatch
+  workflow_dispatch:
+concurrency:
+  group: job1
+  cancel-in-progress: false
+jobs:
+  descoberta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python scripts/job1_descoberta.py
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
