@@ -28,9 +28,11 @@ def channels_info(channel_ids):
         ).execute()
         for it in data.get("items", []):
             st = it.get("statistics", {})
-            th = it.get("snippet", {}).get("thumbnails", {})
+            sn = it.get("snippet", {})
+            th = sn.get("thumbnails", {})
             thumb = (th.get("high") or th.get("medium") or th.get("default") or {}).get("url")
             out[it["id"]] = {
+                "nome": sn.get("title"),
                 "uploads_playlist_id": it["contentDetails"]["relatedPlaylists"]["uploads"],
                 "thumbnail_url": thumb,
                 "subs": int(st.get("subscriberCount", 0)),

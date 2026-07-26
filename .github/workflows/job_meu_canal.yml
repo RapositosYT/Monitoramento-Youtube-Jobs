@@ -1,0 +1,20 @@
+name: Job Meu Canal
+on:
+  workflow_dispatch:
+concurrency:
+  group: job_meu_canal
+  cancel-in-progress: false
+jobs:
+  meu-canal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python scripts/job_meu_canal.py
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
