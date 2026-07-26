@@ -46,16 +46,9 @@ def main():
             "subs_perdidos": perdidos,
         })
 
-    impressoes = yta.reports().query(
-        ids="channel==MINE",
-        startDate=inicio.isoformat(),
-        endDate=fim.isoformat(),
-        metrics="impressions,impressionsClickThroughRate",
-        dimensions="day",
-    ).execute()
-    for dia, imp, ctr in impressoes.get("rows", []):
-        somar(dia, {"impressoes": imp, "ctr_impressoes": ctr})
-
+    # impressoes/CTR nao existem na API publica do YouTube Analytics -- so
+    # ficam disponiveis dentro do YouTube Studio (mesma limitacao do Test &
+    # Compare de titulo/thumbnail).
     if linhas:
         supa.upsert("meu_canal_analytics_diario", list(linhas.values()), on_conflict="dia")
 
