@@ -24,13 +24,35 @@ def main():
     supa.update("meu_canal", [("eq", "id", canal["id"])], {
         "nome": dados["nome"],
         "thumbnail_url": dados["thumbnail_url"],
+        "uploads_playlist_id": dados["uploads_playlist_id"],
     })
     supa.insert("meu_canal_snapshots", [{
         "subs": dados["subs"],
         "total_views": dados["total_views"],
         "qtd_videos": dados["qtd_videos"],
     }])
-    print(f"Snapshot registrado: {dados['subs']} subs, {dados['total_views']} views, {dados['qtd_videos']} videos.")
+
+    shorts_max_s = int(supa.config_dict().get("shorts_max_segundos", 180))
+    video_ids = yt.playlist_all(dados["uploads_playlist_id"]) if dados.get("uploads_playlist_id") else []
+    linhas = []
+    if video_ids:
+        detalhes = yt.videos_info(video_ids)
+        for vid, v in detalhes.items():
+            linhas.append({
+                "youtube_video_id": vid,
+                "titulo": v["titulo"],
+                "thumbnail_url": v["thumbnail_url"],
+                "tipo": "short" if 0 < v["duracao_s"] <= shorts_max_s else "longo",
+                "duracao_s": v["duracao_s"],
+                "published_at": v["published_at"],
+                "views": v["views"],
+                "likes": v["likes"],
+                "comentarios": v["comentarios"],
+            })
+        supa.upsert("meu_canal_videos", linhas, on_conflict="youtube_video_id")
+
+    print(f"Snapshot registrado: {dados['subs']} subs, {dados['total_views']} views, {dados['qtd_videos']} videos "
+          f"| {len(linhas)} videos do catalogo atualizados.")
 
 
 if __name__ == "__main__":

@@ -56,6 +56,27 @@ def playlist_recent(playlist_id, max_results=10):
     return [it["contentDetails"]["videoId"] for it in data.get("items", [])]
 
 
+def playlist_all(playlist_id):
+    """Pagina a playlist inteira (usado pro canal proprio, onde queremos o
+    catalogo completo -- diferente de playlist_recent, usado pra descoberta
+    continua de concorrentes)."""
+    ids, token = [], None
+    while True:
+        params = {"part": "contentDetails", "playlistId": playlist_id, "maxResults": 50}
+        if token:
+            params["pageToken"] = token
+        try:
+            data = client().playlistItems().list(**params).execute()
+        except HttpError as e:
+            if e.resp.status == 404:
+                return ids
+            raise
+        ids += [it["contentDetails"]["videoId"] for it in data.get("items", [])]
+        token = data.get("nextPageToken")
+        if not token:
+            return ids
+
+
 def videos_info(video_ids):
     out = {}
     for i in range(0, len(video_ids), 50):
