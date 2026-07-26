@@ -1,4 +1,5 @@
 supabase
 google-api-python-client
 google-genai
+google-auth-oauthlib
 python-dotenv

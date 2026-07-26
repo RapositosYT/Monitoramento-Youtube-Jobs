@@ -35,6 +35,12 @@ def insert(table, rows):
     return client().table(table).insert(rows).execute().data
 
 
+def upsert(table, rows, on_conflict):
+    if not rows:
+        return []
+    return client().table(table).upsert(rows, on_conflict=on_conflict).execute().data
+
+
 def update(table, filters, data):
     _apply(client().table(table).update(data), filters).execute()
 
