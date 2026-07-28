@@ -81,7 +81,7 @@ def videos_info(video_ids):
     out = {}
     for i in range(0, len(video_ids), 50):
         data = client().videos().list(
-            part="snippet,contentDetails,statistics",
+            part="snippet,contentDetails,statistics,liveStreamingDetails",
             id=",".join(video_ids[i:i + 50]),
         ).execute()
         for it in data.get("items", []):
@@ -98,6 +98,11 @@ def videos_info(video_ids):
                 "views": int(st.get("viewCount", 0)),
                 "likes": int(st.get("likeCount", 0)),
                 "comentarios": int(st.get("commentCount", 0)),
+                # presenca de liveStreamingDetails cobre live em andamento, estreia
+                # agendada (upcoming) e gravacao de live ja encerrada -- todos os
+                # 3 casos tem dinamica de metricas diferente de video normal e
+                # nao devem entrar no rastreamento.
+                "ao_vivo": "liveStreamingDetails" in it,
             }
     return out
 

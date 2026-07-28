@@ -34,9 +34,18 @@ def main():
 
     info = yt.videos_info([v["youtube_video_id"] for v in ativos])
     processados = 0
+    removidos = 0
     for v in ativos:
         d = info.get(v["youtube_video_id"])
         if not d:
+            # video sumiu da API -- foi apagado ou ficou privado. Fecha o
+            # rastreamento na hora em vez de deixar "zumbi" parado esperando
+            # os 14 dias (sem receber snapshot novo nenhum nesse meio tempo).
+            supa.update(
+                "videos", [("eq", "id", v["id"])],
+                {"rastreamento_ativo": False, "removido": True, "removido_em": agora_iso},
+            )
+            removidos += 1
             continue
         processados += 1
         registrar_snapshot(v, d, agora, agora_iso, limiares, amostra_minima, janela_videos)
@@ -57,7 +66,8 @@ def main():
     atualizados_tier = atualizar_tier_efetivo(amostra_minima, cfg)
     atualizados_corredor = atualizar_corredor_estagio(cfg)
 
-    print(f"Videos processados: {processados} | janelas fechadas (downsampling): {len(fechando)} "
+    print(f"Videos processados: {processados} | removidos (apagados/privados): {removidos} "
+          f"| janelas fechadas (downsampling): {len(fechando)} "
           f"| tier_efetivo atualizados: {atualizados_tier} | corredor_estagio atualizados: {atualizados_corredor}")
 
 

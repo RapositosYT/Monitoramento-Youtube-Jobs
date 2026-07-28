@@ -63,8 +63,14 @@ def main():
     info = yt.videos_info(novos_ids)
     limite = agora - datetime.timedelta(days=janela_dias)
     linhas = []
+    ignorados_agendado_ou_live = 0
     for vid, v in info.items():
         pub = datetime.datetime.fromisoformat(v["published_at"].replace("Z", "+00:00"))
+        if pub > agora or v["ao_vivo"]:
+            # ainda agendado (published_at no futuro) ou e/foi live/estreia --
+            # continua "desconhecido" e sera reavaliado na proxima descoberta.
+            ignorados_agendado_ou_live += 1
+            continue
         linhas.append({
             "channel_id": candidatos[vid],
             "youtube_video_id": vid,
@@ -82,7 +88,8 @@ def main():
         if d:
             registrar_snapshot(video, d, agora, agora_iso, limiares, amostra_minima, janela_videos)
     classificados = classificar_novos(inseridos, info)
-    print(f"Canais: {len(canais)} | snapshots: {len(snaps)} | videos novos: {len(linhas)} | classificados: {classificados}")
+    print(f"Canais: {len(canais)} | snapshots: {len(snaps)} | videos novos: {len(linhas)} | "
+          f"ignorados (agendado/live): {ignorados_agendado_ou_live} | classificados: {classificados}")
 
 
 def classificar_novos(inseridos, info):

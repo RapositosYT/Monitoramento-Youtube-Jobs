@@ -132,6 +132,7 @@ def calcular_desvio(v, views_atuais, checkpoint, amostra_minima, limiares, janel
         filters=[
             ("eq", "channel_id", v["channel_id"]),
             ("eq", "tipo", v["tipo"]),
+            ("eq", "removido", False),
         ],
     )
     recentes = sorted(
