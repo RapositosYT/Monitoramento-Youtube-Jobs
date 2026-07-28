@@ -7,7 +7,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 load_dotenv()
 from lib import supa, yt  # noqa: E402
 from lib.conquistas import (  # noqa: E402
-    media_views_7d_longo_meu_canal, verificar_conquistas_canais, verificar_conquistas_inscritos,
+    soma_views_7d_longo_meu_canal, verificar_conquistas_canais, verificar_conquistas_inscritos,
 )
 
 
@@ -55,8 +55,8 @@ def main():
         supa.upsert("meu_canal_videos", linhas, on_conflict="youtube_video_id")
 
     novas_inscritos = verificar_conquistas_inscritos(dados["subs"])
-    media_minha = media_views_7d_longo_meu_canal()
-    novas_canais = verificar_conquistas_canais(media_minha)
+    minha_soma = soma_views_7d_longo_meu_canal()
+    novas_canais = verificar_conquistas_canais(minha_soma)
 
     print(f"Snapshot registrado: {dados['subs']} subs, {dados['total_views']} views, {dados['qtd_videos']} videos "
           f"| {len(linhas)} videos do catalogo atualizados "

@@ -13,8 +13,10 @@ METAS_INSCRITOS = [
 ]
 
 # Os 10 canais de destaque do nicho BR escolhidos manualmente -- desbloqueia
-# quando a media de views (videos longos, ultimos 7 dias) do canal proprio
+# quando a SOMA de views (videos longos, ultimos 7 dias) do canal proprio
 # supera a do respectivo canal numa mesma semana (nao precisa sustentar).
+# Soma em vez de media pra nao recompensar um unico video de sorte contra um
+# canal que manteve resultado consistente em varios videos na semana.
 CANAIS_DESTAQUE = [
     ("cadres", "Cadres"), ("athos", "Athos"), ("probiems", "ProbIems"),
     ("marcelodrv", "Marcelodrv"), ("welix", "WELIX"), ("xmarcelo", "xMarcelo"),
@@ -41,7 +43,7 @@ def verificar_conquistas_inscritos(subs_atual):
     return novas
 
 
-def media_views_7d_longo_canal(channel_id):
+def soma_views_7d_longo_canal(channel_id):
     sete_dias = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).isoformat()
     videos = supa.get(
         "videos", "id",
@@ -64,10 +66,10 @@ def media_views_7d_longo_canal(channel_id):
             ultimo_por_video[s["video_id"]] = s
     if not ultimo_por_video:
         return None
-    return sum(s["views"] for s in ultimo_por_video.values()) / len(ultimo_por_video)
+    return sum(s["views"] for s in ultimo_por_video.values())
 
 
-def media_views_7d_longo_meu_canal():
+def soma_views_7d_longo_meu_canal():
     sete_dias = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).isoformat()
     videos = supa.get(
         "meu_canal_videos", "views",
@@ -76,11 +78,11 @@ def media_views_7d_longo_meu_canal():
     views = [v["views"] for v in videos if v["views"] is not None]
     if not views:
         return None
-    return sum(views) / len(views)
+    return sum(views)
 
 
-def verificar_conquistas_canais(media_minha):
-    if media_minha is None:
+def verificar_conquistas_canais(minha_soma):
+    if minha_soma is None:
         return []
     canais = {c["nome"]: c["id"] for c in supa.get("channels", "id,nome")}
     novas = []
@@ -90,7 +92,7 @@ def verificar_conquistas_canais(media_minha):
         channel_id = canais.get(nome_canal)
         if not channel_id:
             continue
-        media_canal = media_views_7d_longo_canal(channel_id)
-        if media_canal and media_minha > media_canal and _desbloquear_se_novo(slug):
+        soma_canal = soma_views_7d_longo_canal(channel_id)
+        if soma_canal and minha_soma > soma_canal and _desbloquear_se_novo(slug):
             novas.append(slug)
     return novas
