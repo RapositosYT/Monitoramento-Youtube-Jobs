@@ -122,12 +122,16 @@ def registrar_alteracoes(video_id, anterior, atual, agora_iso):
 
 
 def calcular_desvio(v, views_atuais, checkpoint, amostra_minima, limiares, janela_videos):
+    # Nao exige mais rastreamento_ativo=False: a maioria dos videos "fechados"
+    # so tem 1 snapshot (pego tarde demais, perto do proprio 14d, geralmente
+    # do backfill inicial), entao exigir isso deixava o desvio praticamente
+    # sem regua de comparacao nos marcos antes de 14d. Um video ainda ativo
+    # que ja passou por esse checkpoint e uma referencia igualmente valida.
     outros_videos = supa.get(
         "videos", "id,published_at",
         filters=[
             ("eq", "channel_id", v["channel_id"]),
             ("eq", "tipo", v["tipo"]),
-            ("eq", "rastreamento_ativo", False),
         ],
     )
     recentes = sorted(
