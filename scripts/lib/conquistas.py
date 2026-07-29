@@ -15,6 +15,15 @@ METAS_INSCRITOS = [
     ("golem-de-cobre", 900000), ("ender-dragon", 1000000),
 ]
 
+# Views em UM UNICO short (o maior short do canal, nao soma) -- espelha
+# METAS_SHORTS em dashboard/components/ConquistasShorts.jsx.
+METAS_SHORTS = [
+    ("shorts", 10000), ("carvao", 20000), ("terra", 25000), ("madeira", 50000),
+    ("pedra", 100000), ("ferro", 300000), ("mel", 400000), ("ouro", 500000),
+    ("esmeralda", 1000000), ("diamante", 2500000), ("netherite", 5000000),
+    ("netherite-encantado", 10000000),
+]
+
 # Os 10 canais de destaque do nicho BR escolhidos manualmente -- desbloqueia
 # quando a SOMA de views (videos longos, ultimos 7 dias) do canal proprio
 # supera a do respectivo canal numa mesma semana (nao precisa sustentar).
@@ -42,6 +51,20 @@ def verificar_conquistas_inscritos(subs_atual):
     novas = []
     for slug, meta in METAS_INSCRITOS:
         if subs_atual >= meta and _desbloquear_se_novo(slug):
+            novas.append(slug)
+    return novas
+
+
+def maior_views_short_meu_canal():
+    shorts = supa.get("meu_canal_videos", "views", filters=[("eq", "tipo", "short")])
+    views = [v["views"] for v in shorts if v["views"] is not None]
+    return max(views) if views else 0
+
+
+def verificar_conquistas_shorts(maior_views):
+    novas = []
+    for slug, meta in METAS_SHORTS:
+        if maior_views >= meta and _desbloquear_se_novo(slug):
             novas.append(slug)
     return novas
 

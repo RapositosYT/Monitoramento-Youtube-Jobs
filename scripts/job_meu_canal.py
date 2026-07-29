@@ -7,7 +7,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 load_dotenv()
 from lib import supa, yt  # noqa: E402
 from lib.conquistas import (  # noqa: E402
-    soma_views_7d_longo_meu_canal, verificar_conquistas_canais, verificar_conquistas_inscritos,
+    maior_views_short_meu_canal, soma_views_7d_longo_meu_canal, verificar_conquistas_canais,
+    verificar_conquistas_inscritos, verificar_conquistas_shorts,
 )
 
 
@@ -57,10 +58,11 @@ def main():
     novas_inscritos = verificar_conquistas_inscritos(dados["subs"])
     minha_soma = soma_views_7d_longo_meu_canal()
     novas_canais = verificar_conquistas_canais(minha_soma)
+    novas_shorts = verificar_conquistas_shorts(maior_views_short_meu_canal())
 
     print(f"Snapshot registrado: {dados['subs']} subs, {dados['total_views']} views, {dados['qtd_videos']} videos "
           f"| {len(linhas)} videos do catalogo atualizados "
-          f"| conquistas novas: {novas_inscritos + novas_canais}")
+          f"| conquistas novas: {novas_inscritos + novas_canais + novas_shorts}")
 
 
 if __name__ == "__main__":
