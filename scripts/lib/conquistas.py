@@ -9,7 +9,10 @@ METAS_INSCRITOS = [
     ("slime", 500), ("galinha", 1000), ("zumbi", 5000), ("esqueleto", 7500),
     ("aranha", 10000), ("creeper", 15000), ("enderman", 20000), ("villager", 35000),
     ("iron-golem", 50000), ("pillager", 75000), ("warden", 100000), ("piglin", 150000),
-    ("wither-skeleton", 200000), ("blaze", 250000), ("golem-de-neve", 300000), ("wither", 500000),
+    ("wither-skeleton", 200000), ("blaze", 250000), ("golem-de-neve", 300000),
+    ("vaca-cogumelo", 350000), ("allay", 400000), ("sapo", 450000), ("wither", 500000),
+    ("axolote", 600000), ("baiacu", 700000), ("comerciante", 800000),
+    ("golem-de-cobre", 900000), ("ender-dragon", 1000000),
 ]
 
 # Os 10 canais de destaque do nicho BR escolhidos manualmente -- desbloqueia
