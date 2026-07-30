@@ -1,5 +1,7 @@
 import collections
 import datetime
+import hashlib
+import json
 import os
 import pathlib
 import sys
@@ -19,6 +21,26 @@ BALDE_MAX = 400
 # nao cresce com o catalogo de videos, so com a quantidade de grupos/temas
 LOTE_GEMINI = 60
 ID_CORINGA = "00000000-0000-0000-0000-000000000000"
+CACHE_DIAS_EXPIRACAO = 60
+
+
+def _hash_lote(rotulo_funcao, payload):
+    bruto = json.dumps({"fn": rotulo_funcao, "payload": payload}, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(bruto.encode("utf-8")).hexdigest()
+
+
+def _cache_buscar(chave):
+    linhas = supa.get("gemini_cache_temas", "resposta", [("eq", "chave", chave)])
+    return linhas[0]["resposta"] if linhas else None
+
+
+def _cache_salvar(chave, resposta):
+    supa.upsert("gemini_cache_temas", [{"chave": chave, "resposta": resposta}], on_conflict="chave")
+
+
+def _limpar_cache_antigo():
+    limite = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=CACHE_DIAS_EXPIRACAO)
+    supa.delete("gemini_cache_temas", [("lt", "criado_em", limite.isoformat())])
 
 
 class UniaoBusca:
@@ -83,7 +105,14 @@ def candidatos_por_termo_raro(grupos, chaves_por_video, termo_raro_df_max):
     for gi, idx in enumerate(grupos):
         termos_do_grupo = {w for i in idx for w in chaves_por_video[i]}
         for w in termos_do_grupo:
-            if df[w] <= termo_raro_df_max:
+            # bigramas (frase de 2 palavras) sao especificos o bastante pra
+            # servir de sinal de fusao mesmo quando aparecem em MUITOS videos
+            # -- e exatamente o caso de series com "regra variavel" tipo
+            # "Minecraft Mas/But", que e recorrente (df alto) mas nao deixa
+            # de ser o mesmo formato. So unigramas ficam presos ao limite de
+            # raridade, que existe pra evitar palavra generica demais.
+            eh_bigrama = "_" in w
+            if eh_bigrama or df[w] <= termo_raro_df_max:
                 por_termo[w].add(gi)
 
     candidatos = set()
@@ -112,12 +141,28 @@ def mesclar_entre_idiomas(grupos, chaves_por_video, videos, termo_raro_df_max):
     fusoes = []
     for inicio in range(0, len(candidatos_ids), LOTE_GEMINI):
         lote_ids = candidatos_ids[inicio:inicio + LOTE_GEMINI]
+        # assinatura por video (nao pelo indice de grupo, que muda a cada
+        # execucao) -- se o mesmo conjunto de grupos/titulos ja foi decidido
+        # antes, reaproveita a resposta em vez de chamar o Gemini de novo
         resumos = [{
             "id": gi,
             "rotulo": rotular(chaves_por_video, grupos[gi]),
             "exemplos": [videos[i]["titulo"] for i in grupos[gi][:3]],
         } for gi in lote_ids]
-        fusoes += gemini.mesclar_temas_entre_idiomas(resumos)
+        payload_cache = [{"rotulo": r["rotulo"], "exemplos": r["exemplos"]} for r in resumos]
+        chave = _hash_lote("mesclar_entre_idiomas", payload_cache)
+        cache = _cache_buscar(chave)
+        if cache is not None:
+            fusoes += [[lote_ids[i] for i in fusao if 0 <= i < len(lote_ids)] for fusao in cache]
+            continue
+        resultado = gemini.mesclar_temas_entre_idiomas(resumos)
+        # resultado vem com os ids reais de lote_ids (gemini recebe "id": gi
+        # original) -- guarda no cache como posicao dentro do lote (0..N-1)
+        # pra ficar independente dos indices de grupo, que sao efemeros
+        posicoes = {gi: i for i, gi in enumerate(lote_ids)}
+        resultado_cache = [[posicoes[gi] for gi in fusao if gi in posicoes] for fusao in resultado]
+        _cache_salvar(chave, resultado_cache)
+        fusoes += resultado
 
     if not fusoes:
         return grupos
@@ -156,7 +201,19 @@ def gerar_rotulos_pt(grupos_finais, chaves_por_video, videos):
     for inicio in range(0, len(grupos_finais), LOTE_GEMINI):
         lote = list(enumerate(grupos_finais))[inicio:inicio + LOTE_GEMINI]
         itens = [{"id": i, "exemplos": [videos[v]["titulo"] for v in idx[:4]]} for i, idx in lote]
+        payload_cache = [{"exemplos": item["exemplos"]} for item in itens]
+        chave = _hash_lote("gerar_rotulos_pt", payload_cache)
+        cache = _cache_buscar(chave)
+        if cache is not None:
+            for posicao, nome in cache.items():
+                gi = lote[int(posicao)][0]
+                if nome:
+                    rotulos[gi] = nome
+            continue
         traduzidos = gemini.gerar_rotulos_pt(itens)
+        posicoes = {i: posicao for posicao, (i, _) in enumerate(lote)}
+        resultado_cache = {str(posicoes[gi]): nome for gi, nome in traduzidos.items() if gi in posicoes}
+        _cache_salvar(chave, resultado_cache)
         for gi, nome in traduzidos.items():
             if nome:
                 rotulos[gi] = nome
@@ -175,6 +232,8 @@ def classificar(total_videos, videos_recentes, dias_totais, cfg):
 
 
 def main():
+    _limpar_cache_antigo()
+
     cfg = supa.config_dict()
     min_videos = int(cfg.get("tema_min_videos", 3))
     min_canais = int(cfg.get("tema_min_canais", 2))
