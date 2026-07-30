@@ -1,3 +1,4 @@
+import collections
 import datetime
 import pathlib
 import sys
@@ -95,7 +96,7 @@ def main():
 def classificar_novos(inseridos, info):
     if not inseridos:
         return 0
-    formatos = supa.get("formatos", "id,nome,descricao")
+    formatos = _ordenar_formatos_por_uso(supa.get("formatos", "id,nome,descricao"))
     classificados = 0
     for video in inseridos:
         descricao = info.get(video["youtube_video_id"], {}).get("descricao", "")
@@ -123,6 +124,17 @@ def classificar_novos(inseridos, info):
         supa.upsert("video_formatos", linhas_junction, on_conflict="video_id,formato_id")
         classificados += 1
     return classificados
+
+
+def _ordenar_formatos_por_uso(formatos):
+    """Ordena do formato mais usado pro menos usado. O gemini.py corta a
+    lista em MAX_FORMATOS_PROMPT antes de montar o prompt (pra nao inflar
+    token conforme o catalogo de formatos cresce) -- sem essa ordenacao, esse
+    corte seguiria a ordem arbitraria que veio do banco, podendo esconder
+    justamente o formato mais comum (e mais provavel de ser o certo) so
+    porque ele calhou de ficar depois da posicao 80."""
+    contagem = collections.Counter(r["formato_id"] for r in supa.get("video_formatos", "formato_id"))
+    return sorted(formatos, key=lambda f: contagem.get(f["id"], 0), reverse=True)
 
 
 def garantir_formato(nome, formatos_conhecidos):
