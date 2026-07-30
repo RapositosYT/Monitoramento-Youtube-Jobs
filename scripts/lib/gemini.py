@@ -6,13 +6,57 @@ from google.genai import types
 
 MODEL = "gemini-2.5-flash"
 _client = None
+_chaves = None
+_indice_chave = 0
+
+
+def _lista_chaves():
+    global _chaves
+    if _chaves is None:
+        candidatas = [os.environ.get("GEMINI_API_KEY")] + [
+            os.environ.get(f"GEMINI_API_KEY_{n}") for n in (2, 3)
+        ]
+        _chaves = [c for c in candidatas if c]
+        if not _chaves:
+            raise RuntimeError("nenhuma GEMINI_API_KEY configurada")
+    return _chaves
 
 
 def client():
     global _client
     if _client is None:
-        _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        _client = genai.Client(api_key=_lista_chaves()[_indice_chave])
     return _client
+
+
+def _e_erro_de_limite(e):
+    texto = str(e).lower()
+    return any(s in texto for s in ("resource_exhausted", "429", "quota", "rate limit"))
+
+
+def _gerar(prompt, mime="application/json"):
+    """Chama generate_content com a chave atual; se o erro indicar limite
+    atingido, roda pra proxima GEMINI_API_KEY configurada e tenta de novo,
+    ate esgotar as chaves disponiveis."""
+    global _indice_chave, _client
+    chaves = _lista_chaves()
+    ultimo_erro = None
+    for tentativa in range(len(chaves)):
+        try:
+            return client().models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(response_mime_type=mime),
+            )
+        except Exception as e:
+            ultimo_erro = e
+            if _e_erro_de_limite(e) and _indice_chave + 1 < len(chaves):
+                _indice_chave += 1
+                _client = None
+                print(f"Aviso: chave Gemini {tentativa + 1} atingiu limite, trocando pra chave {_indice_chave + 1}")
+                continue
+            raise
+    raise ultimo_erro
 
 
 def classificar_formato(titulo, descricao, formatos_existentes):
@@ -35,11 +79,7 @@ Escolha o formato ja cadastrado que melhor encaixa nesse video. So proponha um f
 {{"formato": "nome do formato", "confianca": numero de 0.0 a 1.0}}"""
 
     try:
-        resp = client().models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
+        resp = _gerar(prompt)
         data = json.loads(resp.text)
         nome = (data.get("formato") or "").strip()
         confianca = float(data.get("confianca", 0))
@@ -74,11 +114,7 @@ Identifique quais grupos representam o mesmo formato/tema/assunto especifico (ou
 Grupos que nao devem ser fundidos com nenhum outro nao precisam aparecer. Se nenhuma fusao fizer sentido, responda {{"fusoes": []}}."""
 
     try:
-        resp = client().models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
+        resp = _gerar(prompt)
         data = json.loads(resp.text)
         fusoes = data.get("fusoes") or []
         return [f for f in fusoes if isinstance(f, list) and len(f) >= 2]
@@ -107,11 +143,7 @@ Responda apenas com JSON no formato:
 {{"rotulos": [{{"id": id1, "rotulo": "Nome em Portugues"}}, ...]}}"""
 
     try:
-        resp = client().models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
+        resp = _gerar(prompt)
         data = json.loads(resp.text)
         return {item["id"]: item.get("rotulo") for item in data.get("rotulos", []) if item.get("rotulo")}
     except Exception as e:
