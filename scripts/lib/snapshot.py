@@ -2,11 +2,25 @@ import datetime
 
 from . import supa
 
-CHECKPOINTS_H = {"1h": 1, "6h": 6, "24h": 24, "48h": 48, "7d": 168, "14d": 336}
+CHECKPOINTS_H = {
+    "1h": 1, "6h": 6, "24h": 24, "48h": 48,
+    "72h": 72, "96h": 96, "120h": 120, "144h": 144,
+    "7d": 168, "14d": 336,
+}
 # distancia maxima (em horas) entre a coleta e o horario alvo pra aceitar o
 # checkpoint; alem disso o video foi descoberto tarde demais pra ter dado
 # confiavel naquele marco e o checkpoint fica em branco (sem sinal, nao 0)
-CHECKPOINT_TOLERANCIA_H = {"1h": 2, "6h": 3, "24h": 6, "48h": 8, "7d": 24, "14d": 24}
+#
+# 72h/96h/120h/144h preenchem a lacuna de 120h (48h ateh 7d) que antes deixava
+# um vídeo sem nenhuma reavaliacao de desvio por 5 dias -- tempo suficiente
+# pra perder a janela de hype. Job 2 roda de hora em hora, entao ja existe
+# amostra de sobra perto desses horarios (confirmado no banco antes de
+# adicionar), so nunca tinham sido rotulados como marco.
+CHECKPOINT_TOLERANCIA_H = {
+    "1h": 2, "6h": 3, "24h": 6, "48h": 8,
+    "72h": 10, "96h": 10, "120h": 10, "144h": 10,
+    "7d": 24, "14d": 24,
+}
 
 
 def checkpoint_para(horas_desde_pub):
