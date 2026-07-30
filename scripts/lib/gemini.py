@@ -59,11 +59,18 @@ def _gerar(prompt, mime="application/json"):
     raise ultimo_erro
 
 
+MAX_FORMATOS_PROMPT = 80
+MAX_DESCRICAO_FORMATO = 80
+
+
 def classificar_formato(titulo, descricao, formatos_existentes):
     """formatos_existentes: lista de dicts {"nome":..., "descricao":...}.
     Retorna (nome_formato, confianca) ou (None, 0.0) se a chamada falhar."""
+    # cap no numero de formatos e no tamanho da descricao de cada um -- sem
+    # isso o prompt cresce sem limite conforme o catalogo de formatos aumenta.
     lista = "\n".join(
-        f"- {f['nome']}: {f.get('descricao') or ''}" for f in formatos_existentes
+        f"- {f['nome']}: {(f.get('descricao') or '')[:MAX_DESCRICAO_FORMATO]}"
+        for f in formatos_existentes[:MAX_FORMATOS_PROMPT]
     ) or "(nenhum formato cadastrado ainda)"
 
     prompt = f"""Voce classifica videos de Minecraft/Roblox de um canal infantojuvenil brasileiro em um FORMATO de conteudo (ex: "100 dias survival", "tycoon", "roleplay", "desafio").
@@ -73,7 +80,7 @@ Formatos ja cadastrados:
 
 Video para classificar:
 Titulo: {titulo}
-Descricao: {(descricao or "")[:500]}
+Descricao: {(descricao or "")[:300]}
 
 Escolha o formato ja cadastrado que melhor encaixa nesse video. So proponha um formato novo se genuinamente nenhum dos existentes encaixar bem. Responda apenas com JSON no formato:
 {{"formato": "nome do formato", "confianca": numero de 0.0 a 1.0}}"""
