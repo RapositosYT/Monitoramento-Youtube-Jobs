@@ -164,7 +164,14 @@ def mesclar_entre_idiomas(grupos, chaves_por_video, videos, termo_raro_df_max):
         if cache is not None:
             fusoes += [[lote_ids[i] for i in fusao if 0 <= i < len(lote_ids)] for fusao in cache]
             continue
-        resultado = gemini.mesclar_temas_entre_idiomas(resumos)
+        try:
+            resultado = gemini.mesclar_temas_entre_idiomas(resumos)
+        except Exception as e:
+            # NAO cacheia falha -- um "[]" cacheado por engano de uma falha
+            # de API (ex: cota estourada) faria o job parar de tentar esse
+            # lote pra sempre, mesmo depois da cota se recuperar
+            print(f"Aviso: falha ao mesclar temas entre idiomas via Gemini: {e}")
+            continue
         # resultado vem com os ids reais de lote_ids (gemini recebe "id": gi
         # original) -- guarda no cache como posicao dentro do lote (0..N-1)
         # pra ficar independente dos indices de grupo, que sao efemeros
@@ -219,7 +226,13 @@ def gerar_rotulos_pt(grupos_finais, chaves_por_video, videos):
                 if nome:
                     rotulos[gi] = nome
             continue
-        traduzidos = gemini.gerar_rotulos_pt(itens)
+        try:
+            traduzidos = gemini.gerar_rotulos_pt(itens)
+        except Exception as e:
+            # NAO cacheia falha -- ver comentario equivalente em
+            # mesclar_entre_idiomas
+            print(f"Aviso: falha ao gerar rotulos em portugues via Gemini: {e}")
+            continue
         posicoes = {i: posicao for posicao, (i, _) in enumerate(lote)}
         resultado_cache = {str(posicoes[gi]): nome for gi, nome in traduzidos.items() if gi in posicoes}
         _cache_salvar(chave, resultado_cache)

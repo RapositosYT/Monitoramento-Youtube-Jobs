@@ -114,8 +114,11 @@ def mesclar_temas_entre_idiomas(grupos):
     titulo variou demais ao redor de um termo especifico em comum, tipo nome
     de mod/personagem). Usada 1x por execucao do job3_temas (nao por video),
     pra manter o uso da API baixo mesmo com o catalogo de videos crescendo.
-    Retorna lista de listas de ids que devem ser fundidos, ou [] se a chamada
-    falhar ou nenhuma fusao fizer sentido."""
+    Retorna lista de listas de ids que devem ser fundidos, ou [] se nenhuma
+    fusao fizer sentido. Deixa a excecao propagar se a chamada falhar --
+    quem chama (job3_temas.py) decide o que fazer, porque cachear um "[]" que
+    na verdade veio de uma falha de API faria o job parar de tentar de novo
+    pra sempre, mesmo depois da cota se recuperar."""
     if len(grupos) < 2:
         return []
 
@@ -132,23 +135,21 @@ Identifique quais grupos representam o mesmo formato/tema/assunto especifico (ou
 {{"fusoes": [[id1, id2], [id3, id4, id5]]}}
 Grupos que nao devem ser fundidos com nenhum outro nao precisam aparecer. Se nenhuma fusao fizer sentido, responda {{"fusoes": []}}."""
 
-    try:
-        resp = _gerar(prompt)
-        data = json.loads(resp.text)
-        fusoes = data.get("fusoes") or []
-        return [f for f in fusoes if isinstance(f, list) and len(f) >= 2]
-    except Exception as e:
-        print(f"Aviso: falha ao mesclar temas entre idiomas via Gemini: {e}")
-        return []
+    resp = _gerar(prompt)
+    data = json.loads(resp.text)
+    fusoes = data.get("fusoes") or []
+    return [f for f in fusoes if isinstance(f, list) and len(f) >= 2]
 
 
 def gerar_rotulos_pt(itens):
     """itens: lista de dicts {"id": int, "exemplos": [titulos]} -- titulos de
     exemplo de um tema ja fechado (podem estar em portugues, espanhol ou
     ingles). Roda 1x por execucao do job3_temas (nao por video), pra manter o
-    uso da API baixo. Retorna dict {id: rotulo em portugues}, ou {} se a
-    chamada falhar (quem chama mantem o rotulo por palavra-chave como
-    fallback nesse caso)."""
+    uso da API baixo. Retorna dict {id: rotulo em portugues}, ou {} se nenhum
+    rotulo vier. Deixa a excecao propagar se a chamada falhar -- quem chama
+    (job3_temas.py) decide o que fazer, porque cachear um "{}" que na
+    verdade veio de uma falha de API faria o job parar de tentar de novo pra
+    sempre, mesmo depois da cota se recuperar."""
     if not itens:
         return {}
 
@@ -161,10 +162,6 @@ Temas (id, titulos de exemplo):
 Responda apenas com JSON no formato:
 {{"rotulos": [{{"id": id1, "rotulo": "Nome em Portugues"}}, ...]}}"""
 
-    try:
-        resp = _gerar(prompt)
-        data = json.loads(resp.text)
-        return {item["id"]: item.get("rotulo") for item in data.get("rotulos", []) if item.get("rotulo")}
-    except Exception as e:
-        print(f"Aviso: falha ao gerar rotulos em portugues via Gemini: {e}")
-        return {}
+    resp = _gerar(prompt)
+    data = json.loads(resp.text)
+    return {item["id"]: item.get("rotulo") for item in data.get("rotulos", []) if item.get("rotulo")}
