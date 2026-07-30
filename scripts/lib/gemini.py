@@ -4,7 +4,7 @@ import os
 from google import genai
 from google.genai import types
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-flash-latest"
 _client = None
 _chaves = None
 _indice_chave = 0
