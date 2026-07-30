@@ -99,14 +99,28 @@ def classificar_novos(inseridos, info):
     classificados = 0
     for video in inseridos:
         descricao = info.get(video["youtube_video_id"], {}).get("descricao", "")
-        nome, confianca = gemini.classificar_formato(video["titulo"], descricao, formatos)
-        if not nome:
+        resultados = gemini.classificar_formatos(video["titulo"], descricao, formatos)
+        if not resultados:
             continue
-        formato_id = garantir_formato(nome, formatos)
+
+        linhas_junction = []
+        for i, (nome, confianca) in enumerate(resultados):
+            formato_id = garantir_formato(nome, formatos)
+            if formato_id is None:
+                continue
+            linhas_junction.append({
+                "video_id": video["id"], "formato_id": formato_id,
+                "confianca": confianca, "principal": i == 0,
+            })
+        if not linhas_junction:
+            continue
+
+        principal = linhas_junction[0]
         supa.update(
             "videos", [("eq", "id", video["id"])],
-            {"formato_id": formato_id, "confianca_classificacao": confianca},
+            {"formato_id": principal["formato_id"], "confianca_classificacao": principal["confianca"]},
         )
+        supa.upsert("video_formatos", linhas_junction, on_conflict="video_id,formato_id")
         classificados += 1
     return classificados
 

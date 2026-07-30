@@ -63,9 +63,15 @@ MAX_FORMATOS_PROMPT = 80
 MAX_DESCRICAO_FORMATO = 80
 
 
-def classificar_formato(titulo, descricao, formatos_existentes):
+MAX_FORMATOS_POR_VIDEO = 3
+
+
+def classificar_formatos(titulo, descricao, formatos_existentes):
     """formatos_existentes: lista de dicts {"nome":..., "descricao":...}.
-    Retorna (nome_formato, confianca) ou (None, 0.0) se a chamada falhar."""
+    Retorna lista de (nome_formato, confianca) ordenada do mais pro menos
+    confiante (pode ter mais de 1 quando o video genuinamente mistura formatos
+    -- ex: uma serie recorrente tipo "100 dias" com um mod/evento especifico
+    do momento), ou [] se a chamada falhar ou nada encaixar."""
     # cap no numero de formatos e no tamanho da descricao de cada um -- sem
     # isso o prompt cresce sem limite conforme o catalogo de formatos aumenta.
     lista = "\n".join(
@@ -73,7 +79,7 @@ def classificar_formato(titulo, descricao, formatos_existentes):
         for f in formatos_existentes[:MAX_FORMATOS_PROMPT]
     ) or "(nenhum formato cadastrado ainda)"
 
-    prompt = f"""Voce classifica videos de Minecraft/Roblox de um canal infantojuvenil brasileiro em um FORMATO de conteudo (ex: "100 dias survival", "tycoon", "roleplay", "desafio").
+    prompt = f"""Voce classifica videos de Minecraft/Roblox de um canal infantojuvenil brasileiro em FORMATO(s) de conteudo (ex: "100 dias survival", "tycoon", "roleplay", "desafio").
 
 Formatos ja cadastrados:
 {lista}
@@ -82,18 +88,24 @@ Video para classificar:
 Titulo: {titulo}
 Descricao: {(descricao or "")[:300]}
 
-Escolha o formato ja cadastrado que melhor encaixa nesse video. So proponha um formato novo se genuinamente nenhum dos existentes encaixar bem. Responda apenas com JSON no formato:
-{{"formato": "nome do formato", "confianca": numero de 0.0 a 1.0}}"""
+Escolha TODOS os formatos ja cadastrados que genuinamente se aplicam a esse video -- normalmente e so 1, mas as vezes um video mistura um formato recorrente com um mod/evento/viral especifico do momento, e nesse caso os dois se aplicam. So proponha um formato novo se nenhum dos existentes encaixar bem. Responda apenas com JSON no formato:
+{{"formatos": [{{"formato": "nome do formato", "confianca": numero de 0.0 a 1.0}}, ...]}}
+Liste do mais confiante pro menos confiante. Nao invente formatos extras so pra preencher a lista -- a maioria dos videos tem so 1 formato mesmo."""
 
     try:
         resp = _gerar(prompt)
         data = json.loads(resp.text)
-        nome = (data.get("formato") or "").strip()
-        confianca = float(data.get("confianca", 0))
-        return (nome or None), confianca
+        itens = data.get("formatos") or []
+        resultado = []
+        for item in itens[:MAX_FORMATOS_POR_VIDEO]:
+            nome = (item.get("formato") or "").strip()
+            if not nome:
+                continue
+            resultado.append((nome, float(item.get("confianca", 0))))
+        return resultado
     except Exception as e:
         print(f"Aviso: falha ao classificar formato via Gemini: {e}")
-        return None, 0.0
+        return []
 
 
 def mesclar_temas_entre_idiomas(grupos):

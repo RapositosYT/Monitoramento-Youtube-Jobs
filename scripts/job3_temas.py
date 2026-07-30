@@ -22,6 +22,15 @@ BALDE_MAX = 400
 LOTE_GEMINI = 60
 ID_CORINGA = "00000000-0000-0000-0000-000000000000"
 CACHE_DIAS_EXPIRACAO = 60
+# quantos temas SECUNDARIOS (alem do principal) um video pode ganhar --
+# limita pra nao virar uma lista de tags gigante por video
+TEMA_SECUNDARIO_MAX = 2
+TAMANHO_LOTE_INSERT = 500
+
+
+def _inserir_em_lotes(tabela, linhas):
+    for inicio in range(0, len(linhas), TAMANHO_LOTE_INSERT):
+        supa.insert(tabela, linhas[inicio:inicio + TAMANHO_LOTE_INSERT])
 
 
 def _hash_lote(rotulo_funcao, payload):
@@ -240,6 +249,10 @@ def main():
     similaridade_minima = float(cfg.get("tema_similaridade_minima", 0.34))
     termo_raro_df_max = int(cfg.get("tema_termo_raro_df_max", 8))
     janela_quente_dias = int(cfg.get("tema_janela_quente_dias", 30))
+    # limiar bem mais frouxo que similaridade_minima -- aqui o objetivo nao e
+    # decidir o tema principal do video, e so notar que ele TAMBEM toca em
+    # outro tema (ex: video de "100 dias" que tambem usa o mod Verity)
+    similaridade_secundaria_minima = float(cfg.get("tema_secundario_similaridade_minima", 0.15))
 
     todos = supa.get("videos", "id,channel_id,titulo,published_at")
     videos = [v for v in todos if v["titulo"] and v["published_at"]]
@@ -259,6 +272,23 @@ def main():
     ]
     rotulos = gerar_rotulos_pt(qualificados, chaves_por_video, videos)
 
+    # assinatura de cada tema = uniao das palavras-chave dos seus videos --
+    # usada so pra achar afinidade SECUNDARIA (video que tambem toca em outro
+    # tema alem do principal), sem custo de API: e so um jaccard local.
+    membro_de = {i: gi for gi, idx in enumerate(qualificados) for i in idx}
+    assinaturas_tema = [set().union(*(chaves_por_video[i] for i in idx)) if idx else set() for idx in qualificados]
+    secundarios_por_video = collections.defaultdict(list)
+    for vi in range(len(videos)):
+        pontuacoes = []
+        for gi, assinatura in enumerate(assinaturas_tema):
+            if membro_de.get(vi) == gi:
+                continue
+            pontuacao = texto.jaccard(chaves_por_video[vi], assinatura)
+            if pontuacao >= similaridade_secundaria_minima:
+                pontuacoes.append((pontuacao, gi))
+        pontuacoes.sort(reverse=True)
+        secundarios_por_video[vi] = [gi for _, gi in pontuacoes[:TEMA_SECUNDARIO_MAX]]
+
     agora = datetime.datetime.now(datetime.timezone.utc)
     limite_quente = agora - datetime.timedelta(days=janela_quente_dias)
 
@@ -266,6 +296,8 @@ def main():
     supa.delete("temas", [("neq", "id", ID_CORINGA)])
 
     criados = 0
+    tema_id_por_gi = {}
+    linhas_video_temas = []
     for gi, indices in enumerate(qualificados):
         vids = [videos[i] for i in indices]
         canais_distintos = len({v["channel_id"] for v in vids})
@@ -291,9 +323,22 @@ def main():
         }])[0]
 
         supa.update("videos", [("in_", "id", [v["id"] for v in vids])], {"tema_id": tema["id"]})
+        tema_id_por_gi[gi] = tema["id"]
+        linhas_video_temas += [
+            {"video_id": v["id"], "tema_id": tema["id"], "principal": True} for v in vids
+        ]
         criados += 1
 
-    print(f"Videos analisados: {len(videos)} | temas criados: {criados}")
+    for vi, gis_secundarios in secundarios_por_video.items():
+        for gi in gis_secundarios:
+            tema_id = tema_id_por_gi.get(gi)
+            if tema_id:
+                linhas_video_temas.append({"video_id": videos[vi]["id"], "tema_id": tema_id, "principal": False})
+
+    _inserir_em_lotes("video_temas", linhas_video_temas)
+
+    print(f"Videos analisados: {len(videos)} | temas criados: {criados} | "
+          f"associacoes secundarias: {sum(1 for l in linhas_video_temas if not l['principal'])}")
 
 
 if __name__ == "__main__":
