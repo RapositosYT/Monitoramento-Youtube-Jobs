@@ -26,11 +26,15 @@ python scripts/job1_descoberta.py
 
 Todos disparados via `workflow_dispatch`, agendados externamente pelo cron-job.org (agendamento nativo do GitHub Actions não era confiável no minuto 0/horário cheio).
 
-| Workflow | Secrets usados |
-|---|---|
-| Job 1 - Descoberta | `YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`, `GEMINI_API_KEY` |
-| Job 2 - Stats | `YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY` |
-| Job 3 - Temas | `SUPABASE_URL`, `SUPABASE_KEY`, `GEMINI_API_KEY` |
-| Backfill Duracao | `YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY` |
+| Workflow | Secrets usados | Frequência (cron-job.org) |
+|---|---|---|
+| Job 1 - Descoberta | `YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`, `GEMINI_API_KEY` | a cada 30min |
+| Job 2 - Stats | `YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY` | de hora em hora |
+| Job 3 - Temas | `SUPABASE_URL`, `SUPABASE_KEY`, `GEMINI_API_KEY` | 1x/dia, 14h |
+| Job Meu Canal | `YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY` | 4x/dia (0h/6h/12h/18h) |
+| Job Meu Canal Analytics | `YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY` | 2x/dia (0h/12h) |
+| Job Noticias | `SUPABASE_URL`, `SUPABASE_KEY` | 1x/dia, 8h |
+| Job Roblox | `SUPABASE_URL`, `SUPABASE_KEY` | 4x/dia (1h/7h/13h/19h) |
+| Backfill Duracao | `YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY` | manual |
 
 Configure essas secrets em Settings → Secrets and variables → Actions deste repositório.
