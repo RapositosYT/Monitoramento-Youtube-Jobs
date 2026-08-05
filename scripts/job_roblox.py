@@ -20,6 +20,10 @@ HEADERS = {
 }
 TIMEOUT_S = 20
 PAUSA_ENTRE_SORTS_S = 3
+# 14 dias da pra sobra pra qualquer analise de tendencia por enquanto (hoje so'
+# comparamos com a rodada anterior); sem isso a tabela cresce pra sempre, ja
+# que roda varias vezes ao dia.
+DIAS_RETENCAO = 14
 
 # as 3 prateleiras genericas do Discover (nao dependem de historico/amigos do
 # usuario, sao as mesmas pra qualquer visitante) -- as outras 2 que a API
@@ -109,6 +113,9 @@ def main():
                 "downvotes": g.get("totalDownVotes"),
             })
     supa.insert("roblox_snapshots", snapshots)
+
+    limite_retencao = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=DIAS_RETENCAO)
+    supa.delete("roblox_snapshots", [("lt", "coletado_em", limite_retencao.isoformat())])
 
     print(f"Total: {len(todos_jogos)} jogos unicos, {len(snapshots)} linhas de snapshot.")
 
