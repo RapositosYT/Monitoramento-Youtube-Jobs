@@ -2,6 +2,7 @@ import datetime
 import pathlib
 import sys
 import time
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 
@@ -27,8 +28,12 @@ TIMEOUT_S = 20
 DIAS_MAX_NOTICIA = 20
 # limpa noticias mais velhas que isso pra tabela nao crescer sem limite
 DIAS_RETENCAO = 60
-# reddit rate-limita requests em sequencia rapida (429) -- respiro entre fontes
-PAUSA_ENTRE_FONTES_S = 2
+# reddit rate-limita requests em sequencia rapida (429), inclusive de IPs de
+# datacenter tipo GitHub Actions -- respiro entre fontes + retry com backoff
+# especifico pra 429 (as outras fontes raramente precisam, mas nao custa)
+PAUSA_ENTRE_FONTES_S = 4
+RETRY_429_TENTATIVAS = 3
+RETRY_429_ESPERA_BASE_S = 8
 
 FONTES = [
     {"fonte": "YouTube (blog oficial)", "categoria": "youtube",
@@ -46,9 +51,17 @@ NS_ATOM = "{http://www.w3.org/2005/Atom}"
 
 def _buscar_xml(url):
     req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
-        corpo = resp.read()
-    return ET.fromstring(corpo)
+    for tentativa in range(1, RETRY_429_TENTATIVAS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+                corpo = resp.read()
+            return ET.fromstring(corpo)
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or tentativa == RETRY_429_TENTATIVAS:
+                raise
+            espera = RETRY_429_ESPERA_BASE_S * tentativa
+            print(f"  429 recebido, tentativa {tentativa}/{RETRY_429_TENTATIVAS} -- esperando {espera}s")
+            time.sleep(espera)
 
 
 def _parsear_data(texto):
