@@ -1,5 +1,6 @@
 import datetime
 import pathlib
+import re
 import sys
 import time
 import urllib.error
@@ -22,6 +23,10 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 TIMEOUT_S = 20
+TIMEOUT_OG_IMAGE_S = 10
+# quantos bytes da pagina de destino ler procurando <meta og:image> -- a tag
+# fica no <head>, nao precisa baixar a pagina inteira
+LEITURA_OG_IMAGE_BYTES = 200_000
 # noticia mais antiga que isso nao entra no banco -- feeds tipo reddit
 # trazem "top do dia", mas alguns blogs devolvem o historico inteiro no 1o
 # request; sem esse corte a 1a rodada importaria anos de posts de uma vez
@@ -47,6 +52,14 @@ FONTES = [
 ]
 
 NS_ATOM = "{http://www.w3.org/2005/Atom}"
+NS_MRSS = "{http://search.yahoo.com/mrss/}"
+
+RE_OG_IMAGE = re.compile(
+    r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', re.IGNORECASE
+)
+RE_OG_IMAGE_ALT = re.compile(
+    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', re.IGNORECASE
+)
 
 
 def _buscar_xml(url):
@@ -62,6 +75,20 @@ def _buscar_xml(url):
             espera = RETRY_429_ESPERA_BASE_S * tentativa
             print(f"  429 recebido, tentativa {tentativa}/{RETRY_429_TENTATIVAS} -- esperando {espera}s")
             time.sleep(espera)
+
+
+# YouTube/Minecraft nao trazem imagem no proprio feed -- busca o <meta
+# og:image> direto na pagina de destino (so' os primeiros bytes, a tag fica
+# no <head>). Falha aqui nunca derruba o job, so' fica sem imagem.
+def _buscar_og_image(url):
+    try:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=TIMEOUT_OG_IMAGE_S) as resp:
+            html = resp.read(LEITURA_OG_IMAGE_BYTES).decode("utf-8", errors="ignore")
+        m = RE_OG_IMAGE.search(html) or RE_OG_IMAGE_ALT.search(html)
+        return m.group(1) if m else None
+    except Exception:
+        return None
 
 
 def _parsear_data(texto):
@@ -93,8 +120,12 @@ def _itens_rss2(raiz):
             if link_el is not None:
                 link = (link_el.get("href") or "").strip()
         publicado = _parsear_data(item.findtext("pubDate"))
+        imagem = None
+        thumb_el = item.find(f"{NS_MRSS}thumbnail")
+        if thumb_el is not None:
+            imagem = thumb_el.get("url")
         if titulo and link:
-            itens.append((titulo, link, publicado))
+            itens.append((titulo, link, publicado, imagem))
     return itens
 
 
@@ -105,12 +136,16 @@ def _itens_atom(raiz):
         link_el = entry.find(f"{NS_ATOM}link[@rel='alternate']") or entry.find(f"{NS_ATOM}link")
         link = link_el.get("href", "").strip() if link_el is not None else ""
         publicado = _parsear_data(entry.findtext(f"{NS_ATOM}published") or entry.findtext(f"{NS_ATOM}updated"))
+        imagem = None
+        thumb_el = entry.find(f"{NS_MRSS}thumbnail")
+        if thumb_el is not None:
+            imagem = thumb_el.get("url")
         if titulo and link:
-            itens.append((titulo, link, publicado))
+            itens.append((titulo, link, publicado, imagem))
     return itens
 
 
-def _coletar_fonte(fonte):
+def _coletar_fonte(fonte, imagens_conhecidas):
     try:
         raiz = _buscar_xml(fonte["url"])
     except Exception as e:
@@ -121,26 +156,40 @@ def _coletar_fonte(fonte):
     limite = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=DIAS_MAX_NOTICIA)
 
     linhas = []
-    for titulo, link, publicado in itens:
+    for titulo, link, publicado, imagem in itens:
         if publicado is not None and publicado < limite:
             continue
+        if not imagem:
+            # ja tem imagem salva de uma coleta anterior? nao busca de novo
+            imagem = imagens_conhecidas.get(link)
+        if not imagem:
+            imagem = _buscar_og_image(link)
         linhas.append({
             "fonte": fonte["fonte"],
             "categoria": fonte["categoria"],
             "titulo": titulo,
             "link": link,
+            "imagem_url": imagem,
             "publicado_em": publicado.isoformat() if publicado else None,
         })
     return linhas
 
 
 def main():
+    imagens_conhecidas = {
+        n["link"]: n["imagem_url"]
+        for n in supa.get("noticias", "link,imagem_url")
+        if n.get("imagem_url")
+    }
+
     todas = []
     for i, fonte in enumerate(FONTES):
         if i > 0:
             time.sleep(PAUSA_ENTRE_FONTES_S)
-        linhas = _coletar_fonte(fonte)
-        print(f"[{fonte['fonte']}] {len(linhas)} noticias dentro da janela de {DIAS_MAX_NOTICIA} dias.")
+        linhas = _coletar_fonte(fonte, imagens_conhecidas)
+        com_imagem = sum(1 for l in linhas if l["imagem_url"])
+        print(f"[{fonte['fonte']}] {len(linhas)} noticias dentro da janela de {DIAS_MAX_NOTICIA} dias "
+              f"({com_imagem} com imagem).")
         todas.extend(linhas)
 
     if todas:
