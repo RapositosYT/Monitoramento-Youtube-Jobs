@@ -162,14 +162,17 @@ def _coletar_fonte(fonte, imagens_conhecidas):
     limite = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=DIAS_MAX_NOTICIA)
 
     linhas = []
-    for titulo, link, publicado, imagem in itens:
+    for titulo, link, publicado, imagem_descricao in itens:
         if publicado is not None and publicado < limite:
             continue
+        # ja tem imagem salva de uma coleta anterior? nao busca de novo
+        imagem = imagens_conhecidas.get(link)
         if not imagem:
-            # ja tem imagem salva de uma coleta anterior? nao busca de novo
-            imagem = imagens_conhecidas.get(link)
-        if not imagem:
-            imagem = _buscar_og_image(link)
+            # og:image da pagina de destino tende a ser a imagem de capa de
+            # verdade (screenshot/thumbnail); a imagem embutida na descricao
+            # do item as vezes eh so um icone pequeno sem relacao com o post
+            # (ex: emoji/logo citado no corpo do texto do Developer Forum)
+            imagem = _buscar_og_image(link) or imagem_descricao
         linhas.append({
             "fonte": fonte["fonte"],
             "categoria": fonte["categoria"],
