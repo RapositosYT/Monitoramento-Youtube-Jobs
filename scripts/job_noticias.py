@@ -27,32 +27,33 @@ TIMEOUT_OG_IMAGE_S = 10
 # quantos bytes da pagina de destino ler procurando <meta og:image> -- a tag
 # fica no <head>, nao precisa baixar a pagina inteira
 LEITURA_OG_IMAGE_BYTES = 200_000
-# noticia mais antiga que isso nao entra no banco -- feeds tipo reddit
-# trazem "top do dia", mas alguns blogs devolvem o historico inteiro no 1o
-# request; sem esse corte a 1a rodada importaria anos de posts de uma vez
+# noticia mais antiga que isso nao entra no banco -- alguns feeds devolvem o
+# historico inteiro no 1o request; sem esse corte a 1a rodada importaria
+# anos de posts de uma vez
 DIAS_MAX_NOTICIA = 20
 # limpa noticias mais velhas que isso pra tabela nao crescer sem limite
 DIAS_RETENCAO = 60
-# reddit rate-limita requests em sequencia rapida (429), inclusive de IPs de
-# datacenter tipo GitHub Actions -- respiro entre fontes + retry com backoff
-# especifico pra 429 (as outras fontes raramente precisam, mas nao custa)
+# respiro entre fontes + retry com backoff pra 429 -- nenhuma fonte atual
+# rate-limita normalmente, mas nao custa manter a defesa (Cloudflare/
+# Discourse podem reagir mal a rajada de requests)
 PAUSA_ENTRE_FONTES_S = 4
 RETRY_429_TENTATIVAS = 3
 RETRY_429_ESPERA_BASE_S = 8
 
+# Reddit foi removido -- na pratica o top do dia trazia muito mais fofoca/
+# papo de usuario do que noticia de verdade sobre o nicho, dificil de filtrar
+# automaticamente. Roblox ganha o Developer Forum oficial (release notes de
+# verdade) no lugar do r/roblox.
 FONTES = [
     {"fonte": "YouTube (blog oficial)", "categoria": "youtube",
      "url": "https://blog.youtube/rss/"},
     {"fonte": "Minecraft (oficial)", "categoria": "minecraft",
      "url": "https://www.minecraft.net/en-us/feeds/community-content/rss"},
-    {"fonte": "Reddit r/Minecraft", "categoria": "minecraft",
-     "url": "https://www.reddit.com/r/Minecraft/top/.rss?t=day"},
-    {"fonte": "Reddit r/roblox", "categoria": "roblox",
-     "url": "https://www.reddit.com/r/roblox/top/.rss?t=day"},
+    {"fonte": "Roblox Developer Forum", "categoria": "roblox",
+     "url": "https://devforum.roblox.com/c/updates/announcements/62.rss"},
 ]
 
 NS_ATOM = "{http://www.w3.org/2005/Atom}"
-NS_MRSS = "{http://search.yahoo.com/mrss/}"
 
 RE_OG_IMAGE = re.compile(
     r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', re.IGNORECASE
@@ -60,6 +61,16 @@ RE_OG_IMAGE = re.compile(
 RE_OG_IMAGE_ALT = re.compile(
     r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', re.IGNORECASE
 )
+# imagem embutida no HTML da propria descricao do item (ex: Developer Forum
+# da Roblox, que usa Discourse e cita a imagem de preview do link no corpo)
+RE_IMG_TAG = re.compile(r'<img[^>]+src=["\']([^"\']+)', re.IGNORECASE)
+
+
+def _normalizar_url_imagem(url):
+    if not url:
+        return None
+    # algumas fontes devolvem URL relativa a protocolo ("//dominio/img.jpg")
+    return f"https:{url}" if url.startswith("//") else url
 
 
 def _buscar_xml(url):
@@ -86,7 +97,7 @@ def _buscar_og_image(url):
         with urllib.request.urlopen(req, timeout=TIMEOUT_OG_IMAGE_S) as resp:
             html = resp.read(LEITURA_OG_IMAGE_BYTES).decode("utf-8", errors="ignore")
         m = RE_OG_IMAGE.search(html) or RE_OG_IMAGE_ALT.search(html)
-        return m.group(1) if m else None
+        return _normalizar_url_imagem(m.group(1)) if m else None
     except Exception:
         return None
 
@@ -120,10 +131,9 @@ def _itens_rss2(raiz):
             if link_el is not None:
                 link = (link_el.get("href") or "").strip()
         publicado = _parsear_data(item.findtext("pubDate"))
-        imagem = None
-        thumb_el = item.find(f"{NS_MRSS}thumbnail")
-        if thumb_el is not None:
-            imagem = thumb_el.get("url")
+        descricao = item.findtext("description") or ""
+        m = RE_IMG_TAG.search(descricao)
+        imagem = _normalizar_url_imagem(m.group(1)) if m else None
         if titulo and link:
             itens.append((titulo, link, publicado, imagem))
     return itens
@@ -136,12 +146,8 @@ def _itens_atom(raiz):
         link_el = entry.find(f"{NS_ATOM}link[@rel='alternate']") or entry.find(f"{NS_ATOM}link")
         link = link_el.get("href", "").strip() if link_el is not None else ""
         publicado = _parsear_data(entry.findtext(f"{NS_ATOM}published") or entry.findtext(f"{NS_ATOM}updated"))
-        imagem = None
-        thumb_el = entry.find(f"{NS_MRSS}thumbnail")
-        if thumb_el is not None:
-            imagem = thumb_el.get("url")
         if titulo and link:
-            itens.append((titulo, link, publicado, imagem))
+            itens.append((titulo, link, publicado, None))
     return itens
 
 
