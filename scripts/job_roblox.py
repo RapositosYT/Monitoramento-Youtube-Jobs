@@ -117,6 +117,13 @@ def main():
     limite_retencao = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=DIAS_RETENCAO)
     supa.delete("roblox_snapshots", [("lt", "coletado_em", limite_retencao.isoformat())])
 
+    # jogo que sumiu de todas as prateleiras ha mais de DIAS_RETENCAO dias:
+    # atualizado_em so' e' tocado quando o jogo aparece de novo num upsert,
+    # entao ficar parado por tanto tempo significa que ja nao sobrou nenhum
+    # snapshot dele (foram todos apagados acima). Sem isso o catalogo cresce
+    # pra sempre com jogo que nunca mais volta.
+    supa.delete("roblox_jogos", [("lt", "atualizado_em", limite_retencao.isoformat())])
+
     print(f"Total: {len(todos_jogos)} jogos unicos, {len(snapshots)} linhas de snapshot.")
 
 
