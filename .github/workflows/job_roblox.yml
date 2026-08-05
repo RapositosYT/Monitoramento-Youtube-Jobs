@@ -1,0 +1,19 @@
+name: Job Roblox
+on:
+  workflow_dispatch:
+concurrency:
+  group: job_roblox
+  cancel-in-progress: false
+jobs:
+  roblox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python scripts/job_roblox.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
