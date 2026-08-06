@@ -24,6 +24,20 @@ METAS_SHORTS = [
     ("netherite-encantado", 10000000),
 ]
 
+# Soma de views de TODO o canal desde sempre (total_views da API do YouTube,
+# nao e soma calculada aqui) -- espelha METAS em
+# dashboard/components/ConquistasViewsTotais.jsx. Slugs prefixados com
+# "vt-" de proposito pra nao colidir com METAS_SHORTS (mesmos nomes de
+# material, thresholds bem diferentes -- "madeira" ali e' 50 mil views num
+# unico short, aqui e' 5 milhoes de views somadas do canal inteiro).
+METAS_VIEWS_TOTAIS = [
+    ("vt-youtube", 1000000), ("vt-terra", 2500000), ("vt-madeira", 5000000),
+    ("vt-pedra", 10000000), ("vt-carvao", 25000000), ("vt-ferro", 50000000),
+    ("vt-mel", 100000000), ("vt-ouro", 150000000), ("vt-esmeralda", 200000000),
+    ("vt-diamante", 250000000), ("vt-netherite", 500000000),
+    ("vt-netherite-encantado", 1000000000),
+]
+
 # Os 10 canais de destaque do nicho BR escolhidos manualmente -- desbloqueia
 # quando a SOMA de views (videos longos, ultimos 7 dias) do canal proprio
 # supera a do respectivo canal numa mesma semana (nao precisa sustentar).
@@ -65,6 +79,14 @@ def verificar_conquistas_shorts(maior_views):
     novas = []
     for slug, meta in METAS_SHORTS:
         if maior_views >= meta and _desbloquear_se_novo(slug):
+            novas.append(slug)
+    return novas
+
+
+def verificar_conquistas_views_totais(total_views):
+    novas = []
+    for slug, meta in METAS_VIEWS_TOTAIS:
+        if total_views >= meta and _desbloquear_se_novo(slug):
             novas.append(slug)
     return novas
 

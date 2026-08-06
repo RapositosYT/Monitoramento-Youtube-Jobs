@@ -8,7 +8,7 @@ load_dotenv()
 from lib import supa, yt  # noqa: E402
 from lib.conquistas import (  # noqa: E402
     maior_views_short_meu_canal, soma_views_7d_longo_meu_canal, verificar_conquistas_canais,
-    verificar_conquistas_inscritos, verificar_conquistas_shorts,
+    verificar_conquistas_inscritos, verificar_conquistas_shorts, verificar_conquistas_views_totais,
 )
 
 
@@ -59,10 +59,11 @@ def main():
     minha_soma = soma_views_7d_longo_meu_canal()
     novas_canais = verificar_conquistas_canais(minha_soma)
     novas_shorts = verificar_conquistas_shorts(maior_views_short_meu_canal())
+    novas_views_totais = verificar_conquistas_views_totais(dados["total_views"])
 
     print(f"Snapshot registrado: {dados['subs']} subs, {dados['total_views']} views, {dados['qtd_videos']} videos "
           f"| {len(linhas)} videos do catalogo atualizados "
-          f"| conquistas novas: {novas_inscritos + novas_canais + novas_shorts}")
+          f"| conquistas novas: {novas_inscritos + novas_canais + novas_shorts + novas_views_totais}")
 
 
 if __name__ == "__main__":
