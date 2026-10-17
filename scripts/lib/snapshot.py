@@ -33,14 +33,19 @@ def checkpoint_para(horas_desde_pub):
 def registrar_snapshot(v, d, agora, agora_iso, limiares, amostra_minima, janela_videos):
     publicado = datetime.datetime.fromisoformat(v["published_at"].replace("Z", "+00:00"))
 
-    anteriores = supa.get(
+    # so o snapshot mais recente (pra velocidade/titulo/thumb) e os que seguram
+    # checkpoint (pra limpeza) interessam; baixar o historico inteiro do video
+    # a cada hora era o maior consumidor de egress do Supabase
+    anterior = supa.ultimo(
         "video_snapshots", "id,coletado_em,views,titulo,thumbnail_url,checkpoint",
-        filters=[("eq", "video_id", v["id"])],
+        [("eq", "video_id", v["id"])], "coletado_em",
     )
-    anteriores.sort(key=lambda s: s["coletado_em"])
-    anterior = anteriores[-1] if anteriores else None
+    com_checkpoint = supa.get(
+        "video_snapshots", "id,coletado_em,checkpoint",
+        filters=[("eq", "video_id", v["id"]), ("not_is", "checkpoint", "null")],
+    )
 
-    limpar_checkpoints_invalidos(anteriores, publicado)
+    limpar_checkpoints_invalidos(com_checkpoint, publicado)
 
     velocidade = None
     if anterior:

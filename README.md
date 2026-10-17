@@ -8,7 +8,7 @@ repositório privado principal.
 ## Estrutura
 
 - `scripts/job1_descoberta.py` — descobre vídeos novos (playlistItems) + snapshot de canal em `channel_snapshots`; classifica o formato de cada vídeo novo via Gemini.
-- `scripts/job2_stats.py` — snapshot de stats em `video_snapshots` (views/likes/comentários), velocidade de views/h, checkpoint mais próximo, desvio vs média histórica do canal, detecção de mudança de título/thumbnail, downsampling, recálculo de `tier_efetivo`/`corredor_estagio`.
+- `scripts/job2_stats.py` — snapshot de stats em `video_snapshots` (views/likes/comentários), velocidade de views/h, checkpoint mais próximo, desvio vs média histórica do canal, detecção de mudança de título/thumbnail, downsampling, recálculo de `tier_efetivo` (1x/dia, às 06h UTC, pra economizar egress do Supabase) e `corredor_estagio` (a cada execução).
 - `scripts/job3_temas.py` — agrupamento de vídeos por tema/formato.
 - `scripts/backfill_duracao.py` — preenche duração de vídeos antigos.
 - `scripts/lib/` — clientes Supabase, YouTube e Gemini (cópia do repositório privado).

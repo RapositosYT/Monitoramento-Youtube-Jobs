@@ -14,7 +14,10 @@ def client():
 
 def _apply(query, filters):
     for op, col, val in filters or []:
-        query = getattr(query, op)(col, val)
+        if op == "not_is":
+            query = query.not_.is_(col, val)
+        else:
+            query = getattr(query, op)(col, val)
     return query
 
 
@@ -27,6 +30,13 @@ def get(table, select="*", filters=None):
         if len(r.data) < PAGE:
             return rows
         offset += PAGE
+
+
+def ultimo(table, select, filters, order_col):
+    """Linha mais recente por order_col, sem baixar o resto do historico."""
+    q = _apply(client().table(table).select(select), filters)
+    rows = q.order(order_col, desc=True).limit(1).execute().data
+    return rows[0] if rows else None
 
 
 def insert(table, rows):

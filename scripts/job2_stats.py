@@ -9,6 +9,11 @@ load_dotenv()
 from lib import supa, yt  # noqa: E402
 from lib.snapshot import registrar_snapshot  # noqa: E402
 
+# tier_efetivo muda devagar (media de views dos ultimos videos do canal) e
+# recalcular de hora em hora baixava ~8 MB de snapshots por execucao; basta 1x
+# por dia
+HORA_RECALCULO_TIER_UTC = 6
+
 
 def main():
     cfg = supa.config_dict()
@@ -63,7 +68,9 @@ def main():
             {"rastreamento_ativo": False},
         )
 
-    atualizados_tier = atualizar_tier_efetivo(amostra_minima, cfg)
+    atualizados_tier = 0
+    if agora.hour == HORA_RECALCULO_TIER_UTC:
+        atualizados_tier = atualizar_tier_efetivo(amostra_minima, cfg)
     atualizados_corredor = atualizar_corredor_estagio(cfg)
 
     print(f"Videos processados: {processados} | removidos (apagados/privados): {removidos} "
